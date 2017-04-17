@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.utils import translation
 from django.utils.translation import ugettext, pgettext
-from twilio.rest import TwilioRestClient
+from twilio.rest import Client
 from two_factor.middleware.threadlocals import get_current_request
 
 # Supported voice languages, see http://bit.ly/187I5cr
@@ -36,8 +36,8 @@ class Twilio(object):
     .. _Twilio: http://www.twilio.com/
     """
     def __init__(self):
-        self.client = TwilioRestClient(getattr(settings, 'TWILIO_ACCOUNT_SID'),
-                                       getattr(settings, 'TWILIO_AUTH_TOKEN'))
+        self.client = Client(getattr(settings, 'TWILIO_ACCOUNT_SID'),
+                             getattr(settings, 'TWILIO_AUTH_TOKEN'))
 
     def make_call(self, device, token):
         locale = translation.get_language()
@@ -50,14 +50,22 @@ class Twilio(object):
         self.client.calls.create(to=device.number,
                                  from_=getattr(settings, 'TWILIO_CALLER_ID'),
                                  url=uri,
-                                 method='GET')
+                                 method='GET',
+                                 timeout=15)
 
     def send_sms(self, device, token):
         body = ugettext('Your authentication token is %s' % token)
-        self.client.sms.messages.create(
-            to=device.number,
-            from_=getattr(settings, 'TWILIO_CALLER_ID'),
-            body=body)
+        send_kwargs = {
+            'to': device.number,
+            'body': body
+        }
+        messaging_service_sid = getattr(settings, 'TWILIO_MESSAGING_SERVICE_SID', None)
+        if messaging_service_sid is not None:
+            send_kwargs['messaging_service_sid'] = messaging_service_sid
+        else:
+            send_kwargs['from_'] = getattr(settings, 'TWILIO_CALLER_ID')
+
+        self.client.messages.create(**send_kwargs)
 
 
 def validate_voice_locale(locale):
