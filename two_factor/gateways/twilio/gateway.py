@@ -7,6 +7,7 @@ except ImportError:
 
 from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.template.loader import render_to_string
 from django.utils import translation
 from django.utils.translation import ugettext, pgettext
 from twilio.rest import Client
@@ -54,7 +55,10 @@ class Twilio(object):
                                  timeout=15)
 
     def send_sms(self, device, token):
-        body = ugettext('Your authentication token is %s' % token)
+        body = render_to_string(
+            'two_factor/twilio/sms_message.html',
+            {'token': token}
+        )
         send_kwargs = {
             'to': device.number,
             'body': body
